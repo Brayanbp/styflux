@@ -1,4 +1,4 @@
-styflux
+Styflux
 =======
 
 Framework CSS
