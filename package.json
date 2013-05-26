@@ -12,7 +12,7 @@
   "main": "./lib/styflux",
   "repository": {
     "type": "git",
-    "url": "http://github.com/pinguxx/node-bowser.git"
+    "url": "https://github.com/Brayanbp/styflux.git"
   },
   "engines": {
     "node": "> 0.2.0"
@@ -22,6 +22,6 @@
   ],
   "readme": "# Styflux\r\n\r\nUn framework de desarrollo Frontend.",
   "readmeFilename": "README.md",
-  "_id": "styflux@0.1.6",
+  "_id": "styflux@0.2.2",
   "_from": "styflux@"
 }
