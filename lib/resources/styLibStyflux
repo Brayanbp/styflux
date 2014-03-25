@@ -34,7 +34,7 @@ var fs=require('fs'),
 		var _this=this,
 			flagWin=('win32' == os.platform())?true:false,
 			fname=path.basename(file,".styl"),
-			routeTmp=file.split(path.basename(file)).join("")+"."+fname;
+			routeTmp=file.split(path.basename(file)).join("")+fname;
 		_this.readFile(file,function(data){
 			_this.createFile(routeTmp,data,function(){
 				if(flagWin){_this.hiddenWin(routeTmp);}
@@ -48,25 +48,26 @@ var fs=require('fs'),
 	};
 	styflux.interpretPrefix=function(route,file){ //Interprete de prefijos . Route (Ruta de archivo que contiene los imports) y file (Ruta de la importacion)
 		var _this=this,
+			flagWin=('win32' == os.platform())?true:false,
 			json={
 				"prepend":"", //Devuelve todos los imports que van al inicio del contenido
 				"append":"", //Devuelve todos los imports que van al final del contenido
-				"last":"" //Devuelve todos los imports que van al final 
+				"last":"" //Devuelve todos los imports que van al final
 			},
-			rout=this.pathRelative(route,file.replace(/\[\@[0-9a-zA-Z]+\]/g,"")), //ruta del archivo final		
+			rout=this.pathRelative(route,file.replace(/\[\@[0-9a-zA-Z]+\]/g,"")), //ruta del archivo final			
 			arrs=file.match(/\[\@[0-9a-zA-Z]+\]/g); //Devuelve todos los prefijos en un array
 			interpret={
-				"[@inc]":function(){ //Le quita todos los ../					
-					rout=rout.replace(/\.\.\\/g,"");
+				"[@inc]":function(){ //Le quita todos los ../
+					rout=(flagWin)?rout.replace(/\.\.\\/g,""):rout.replace(/\.\.\//gi,"");
 				},
 				"[@pp]":function(){ //Identifica que va al final del documento
-					json.append=json.append+"\n@import '"+rout+"'";
+					json.prepend=json.prepend+"\n@import '"+rout+"'";
 				},
 				"[@ult]":function(){ //Identifica que debe ir al final de todos los includes
 					json.last=json.last+"\n@import '"+rout+"'";
 				},
 				"default":function(){ //Identifica que debe ir al inicio del documento
-					json.prepend=json.prepend+"@import '"+rout+"'\n";
+					json.append=json.append+"@import '"+rout+"'\n";
 				}
 			};
 		if(arrs!=null){
@@ -85,41 +86,66 @@ var fs=require('fs'),
 				"helpers":"./view-helpers/",
 				"includes":"[@inc]"
 			},
-			_this=this;
-		json=arrs.json || {}; //Json 
-		result=arrs.result || ""; //Respuesta
+			_this=this,
+		json=arrs.json || {}, //Json 
+		result=arrs.result || "", //Respuesta
 		callback=arrs.callback; //Callback
 		if(json.constructor==Object){
-			var arr=json;		
+			var arr=json;
 			for(var index in arr){
-				var rsp=result;
-				if(typeof route[index]!="undefined"){
-					_this.createRoutes({"json":arr[index],"result":route[index],"callback":callback});
-				}else{
-					rsp=rsp+index;
-					(typeof json[index]=="string")?callback(rsp+"/"+json[index],json[index]):_this.createRoutes({"json":json[index],"result":rsp,"callback":callback});
-				}
+				(function(index,arr,result,_this){
+					if(typeof route[index]!="undefined"){
+						_this.createRoutes({"json":arr[index],"result":route[index],"callback":callback});
+					}else{
+						var rsp=result+index;
+						(typeof arr[index]=="string")?callback(rsp+"/"+arr[index],arr[index]):_this.createRoutes({"json":arr[index],"result":rsp,"callback":callback});
+					}
+
+				})(index,arr,result,_this);
 			}
 		}else if(json.constructor==Array){
 			json.forEach(function(file){
 				callback&&callback(result+"/"+file,file);
-			});			
+			});
 		}
 	};
 	styflux.appendFile=function(route,vars,imports,data,callback){ //Agrega data al inicio del archivo
+		//@route Ruta del Archivo a agregar data. Formato: PATH + file
+		//@vars JSON de Variables que se van asociar al archivo
+		//@imports JSON de Importaciones del archivo
+		//@data Data del archivo original
 		var _this=this,
 			file=path.basename(route), //Nombre del archivo
 			arr=vars || {}, //Array de variables
 			content=data || "",  //Almacena la data del archivo
 			attr="", //Variable temporal que almacena los valores de cada variable
 			global="", //Almacena toda las variables globales
+			tmpVarObj= null, //Almacena temporalmento un objeto correspondiente a las variables
+			privateVar="", //Almacena las variables que solo se usaran en
 			prepend="", //Almacena un string de los includes que van al inicio del archivo
 			append="", //Almacena un string de los includes que van al final del archivo
 			last=""; // Almacena un string de los includes que van al final de los includes.
-		/* Interprete de Variables*/
+
+		/* Interprete de Variables */
 		for(var index in arr){
-			attr=(typeof arr[index]=="string")?'"'+arr[index]+'"':arr[index];
-			global=global+index+"="+attr+"\n";
+			if(arr[index].constructor==Object){
+				tmpVarObj= arr[index];
+				if(index=="global"||index==file){
+					for(var vars in tmpVarObj){
+						var vprefix=tmpVarObj[vars].match(/\[\@[0-9a-zA-Z]+\]/g); //Devuelve todos los prefijos en un array
+						attr=(vprefix!=null)?'"'+tmpVarObj[vars].replace(/\[\@[0-9a-zA-Z]+\]/g,"")+'"':tmpVarObj[vars].replace(/\[\@[0-9a-zA-Z]+\]/g,"");
+						if(index!="global"){
+							privateVar=privateVar+vars+"="+attr+"\n";
+						}else{
+							global=global+vars+"="+attr+"\n";
+						}
+					}
+				}
+			}else{
+				var vprefix=arr[index].match(/\[\@[0-9a-zA-Z]+\]/g); //Devuelve todos los prefijos en un array
+				attr=(vprefix!=null)?'"'+arr[index].replace(/\[\@[0-9a-zA-Z]+\]/g,"")+'"':arr[index].replace(/\[\@[0-9a-zA-Z]+\]/g,"");
+				global=global+index+"="+attr+"\n";
+			}			
 		}
 		/* Interprete de Importaciones  */
 		_this.createRoutes({"json":imports[file],"callback":function(file,name){
@@ -128,16 +154,19 @@ var fs=require('fs'),
 			append=append+json.append;
 			last=last+json.last;
 		}});
-		content="@import '"+this.pathRelative(route,"./library/styflux/styflux.styl")+"'\n"+prepend+content+append+last;
+		content="@import '"+this.pathRelative(route,"./library/styflux/styflux.styl")+"'\n"+prepend+"\n"+content+"\n"+append+"\n"+last;
 		/* Funcionando Varibles con content de importarcions */
-		content=global+content;
+		content=global+privateVar+content;
 		_this.createFile(route,content,function(data){
 			callback&&callback(content);
 		});
 	};
-	styflux.compile=function(path,callback){ //Compilar
-		child = exec("stylus -c "+path, function (error, stdout, stderr) {
-			if (error == null) {callback&&callback();}
+	styflux.compile=function(path,params,callback){ //Compilar
+		var comnd=params.cmdr || "",
+			 dest=params.route || "";
+		child = exec("stylus -c "+path+" "+comnd+" "+dest, function (error, stdout, stderr) {
+			if (error != null) {console.log(error);}
+			callback&&callback();
 		});
 	};
 	styflux.mapFiles=function(dir,ext,ignore,callback){ //Buscador de Archivos, busca archivos segun una extension y devuelve sus rutas
@@ -147,7 +176,7 @@ var fs=require('fs'),
 			files.forEach(function(file){
 				var nfile=file;		
 				file=dir+'/'+file;
-				fs.stat(file,function(err,stat){					
+				fs.stat(file,function(err,stat){
 					if(stat.isDirectory()){
 						if(ignore.indexOf(file)==-1){_this.mapFiles(file,ext,ignore,callback);}
 					}else{
@@ -156,6 +185,21 @@ var fs=require('fs'),
 				});
 			});
 		});
+	};
+	styflux.arrmapFiles=function(dir,ext,ignore,result){ //Buscador de Archivos, busca archivos segun una extension y devuelve sus rutas
+		var _this=this,
+			 res=result || [],
+			 files=fs.readdirSync(dir);
+		files.forEach(function(file){
+			file=dir+'/'+file;
+			var status=fs.statSync(file);
+			if(status.isDirectory()){
+				if(ignore.indexOf(file)==-1){_this.arrmapFiles(file,ext,ignore,res);}
+			}else{
+				(path.extname(file)===ext)?res.push(file):"";
+			}
+		});
+		return res;
 	};
 	styflux.dispatchCreate=function(path,name,content){ //Despachador, verifica si es un archivo o un directorio y segun ello toma las acciones respectivas
 		var _this=this;		
@@ -195,21 +239,24 @@ var fs=require('fs'),
 			var dir=routes[i]["path"], //Ruta a recorre
 				ignore=routes[i]["ignore"], //Rutas a ignorar
 				imports=routes[i]["imports"]; //Rutas a importar
-			(function(dir,ignore,imports){							
+			(function(dir,ignore,imports){
 				ignore.forEach(function(ign,index){ //Modifica el ignore, anadiendo su ruta base
 					ignore[index]=routes[i]["path"]+"/"+ign;
-				});			
+				});
+
 				_this.mapFiles(dir,compile.ext,ignore,function(file,name){ //Devuelve rutas de archivos
 					_this.tmpFile(file,function(data,routeTmp){ //Devuelve la lectura del archivo y la ruta temporal
-						_this.appendFile(file,vars,imports,data,function(content){ //Agrega las variables al inicio o al final
-							_this.compile(file,function(){ //Compila
-								_this.createFile(file,data,function(){ //Crea archivo
+						_this.appendFile(routeTmp,vars,imports,data,function(content){ //Agrega las variables al inicio o al final
+							//console.log(routeTmp);
+							_this.compile(routeTmp,compile,function(){ //Compila
+								//_this.createFile(file,data,function(){ //Crea archivo
 									fs.unlink(routeTmp); //Borra temporal
-								});
+								//});
 							});
 						});
 					});
 				});
+
 			})(dir,ignore,imports);
 		}
 	};

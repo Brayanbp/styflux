@@ -1,6 +1,6 @@
 {
   "name": "styflux",
-  "version": "0.2.2",
+  "version": "0.2.9",
   "description": "Framework CSS basado en Stylus",
   "author": {
     "name": "EvangelizandoLaWeb"
@@ -10,6 +10,9 @@
     "styflux": "./bin/styflux"
   },
   "main": "./lib/styflux",
+  "dependencies": {
+    "monocle": "1.1.51"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Brayanbp/styflux.git"
@@ -22,6 +25,9 @@
   ],
   "readme": "# Styflux\r\n\r\nUn framework de desarrollo Frontend.",
   "readmeFilename": "README.md",
-  "_id": "styflux@0.2.2",
-  "_from": "styflux@"
+  "_id": "styflux@0.2.9",
+  "_from": "styflux@",
+  "bugs": {
+    "url": "https://github.com/Brayanbp/styflux/issues"
+  }
 }
